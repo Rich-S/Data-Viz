@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset='utf-8'>
+</head>
+<style>
+    @import url('https://fonts.googleapis.com/css?family=Lato|Open+Sans:800|Roboto');
+    * {
+        font-family: 'Roboto', sans-serif;
+        font-family: 'Lato', sans-serif;
+        font-family: 'Open Sans', sans-serif;
+    }
+</style>
+
+<body>
+    <svg width="960" height="600"></svg>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script>
+        // Set up nodes and links data
+        var nodes = [{
+                "id": "Travis",
+                "sex": "M"
+            },
+            {
+                "id": "Rake",
+                "sex": "M"
+            },
+            {
+                "id": "Diana",
+                "sex": "F"
+            },
+            {
+                "id": "Rachel",
+                "sex": "F"
+            },
+            {
+                "id": "Shawn",
+                "sex": "M"
+            },
+            {
+                "id": "Emerald",
+                "sex": "F"
+            },
+            {
+                "id": "Carl",
+                "sex": "M"
+            },
+            {
+                "id": "Catherine",
+                "sex": "F"
+            },
+            {
+                "id": "Fiona",
+                "sex": "F"
+            },
+            {
+                "id": "Veronica",
+                "sex": "F"
+            },
+            {
+                "id": "Heather",
+                "sex": "F"
+            },
+            {
+                "id": "Deshaun",
+                "sex": "M"
+            }
+        ];
+        var links = [{
+                "source": "Travis",
+                "target": "Rake"
+            },
+            {
+                "source": "Diana",
+                "target": "Rake"
+            },
+            {
+                "source": "Diana",
+                "target": "Rachel"
+            },
+            {
+                "source": "Rachel",
+                "target": "Rake"
+            },
+            {
+                "source": "Rachel",
+                "target": "Shawn"
+            },
+            {
+                "source": "Emerald",
+                "target": "Rachel"
+            },
+            {
+                "source": "Veronica",
+                "target": "Deshaun"
+            },
+            {
+                "source": "Veronica",
+                "target": "Heather"
+            },
+            {
+                "source": "Catherine",
+                "target": "Carl"
+            }
+        ];
+        // We need to set up an index that uses object literals that patterns after dictionaries and hashes in python and ruby, respectively.
+        // The idea is to help determine neighbors of nodes by creating a map or matrix which allows constant-time lookup.
+        // For futher explanation, Bostock's comment on stackoverflow: https://stackoverflow.com/questions/8739072/highlight-selected-node-its-links-and-its-children-in-a-d3-force-directed-grap
+        var linkedByIndex = {};
+        for (i = 0; i < nodes.length; i++) {
+            linkedByIndex[nodes[i].id + ',' + nodes[i].id] = 1;
+        };
+        links.forEach(function(d) {
+            linkedByIndex[d.source + ',' + d.target] = 1;
+        });
+        var svg = d3.select('svg'),
+            width = +svg.attr('width'),
+            height = +svg.attr('height');
+        svg
+            .style('background-color', '#424242');
+        // Draw lines for the links 
+        var link = svg.append("g")
+            .attr('class', 'links')
+            .selectAll('line')
+            .data(links)
+            .enter().append('line')
+            .attr('stroke-width', 3)
+            .attr('stroke', 'white');
+        var node = svg.append('g')
+            .selectAll('.node')
+            .append('g')
+            .data(nodes).enter();
+        var text = node
+            .append('text')
+            .attr('dx', 10)
+            .attr('dy', '.35em')
+            .text(function(d) {
+                return d.id;
+            })
+            .style('opacity', 0)
+            .attr('fill', circleColor);
+        // Draw up the cirlces - which are the svg representations of the data nodes
+        // The circles are drawn after the link and text so as to overlap the preceding svgs'
+        var circle = node
+            .append('circle')
+            .attr('r', 12)
+            .attr('stroke', '#424242')
+            .attr('stroke-width', 2)
+            .attr('fill', circleColor)
+            .on('mouseover', highlight)
+            .on('mouseout', unhighlight);
+        // Because our nodes each have a "id" attribute that we’re using to create the links, we use the link.id() function to tell the accessor function to use the "id" attribute to create our links for us.
+        var link_force = d3.forceLink(links)
+            .id(function(d) {
+                return d.id;
+            });
+        // Simulation updates the position of nodes (or circles)       
+        var simulation = d3.forceSimulation()
+            .nodes(nodes)
+            .force('charge_force', d3.forceManyBody())
+            .force('center_force', d3.forceCenter(width / 2, height / 2))
+            .force('link', link_force)
+            // Without this callback, simulation won't run...
+            .on('tick', tickActions);
+
+        function circleColor(d) {
+            return d.sex == "M" ? "#2B60DE" : "#FF00FF";
+        };
+
+        function highlight(d) {
+            // If you want to inspect DOM object...
+            //console.log(d)
+            circle.style('opacity', function(o) {
+                return neighbors(d, o) ? 1 : .1;
+            });
+            link.style('opacity', function(o) {
+                return d.index == o.source.index ? 1 : .1;
+            });
+            text.style('opacity', function(o) {
+                return neighbors(d, o) ? 1 : 0;
+            });
+        };
+
+        function unhighlight(d) {
+            circle.style('opacity', 1);
+            link.style('opacity', 1);
+            text.style('opacity', 0)
+        };
+        // function to check if nodes have neighbors
+        function neighbors(a, b) {
+            return linkedByIndex[a.id + "," + b.id];
+        };
+
+        function tickActions() {
+            // update circle positions to reflect node updates on each tick of the simulation 
+            circle
+                .attr("cx", function(d) {
+                    return d.x;
+                })
+                .attr("cy", function(d) {
+                    return d.y;
+                });
+            text
+                .attr("x", function(d) {
+                    return d.x + 10;
+                })
+                .attr("y", function(d) {
+                    return d.y - 10;
+                });
+            link
+                .attr("x1", function(d) {
+                    return d.source.x;
+                })
+                .attr("y1", function(d) {
+                    return d.source.y;
+                })
+                .attr("x2", function(d) {
+                    return d.target.x;
+                })
+                .attr("y2", function(d) {
+                    return d.target.y;
+                });
+        };
+
+        // source: http://bl.ocks.org/eyaler/10586116
+        // source: http://www.puzzlr.org/force-graphs-with-d3/
+        // source: http://www.coppelia.io/2014/07/an-a-to-z-of-extra-features-for-the-d3-force-layout/
+        // https://community.modeanalytics.com/gallery/chart-annotations/
+        // more on strokes: https://stackoverflow.com/questions/37597572/how-to-do-stroke-opacity0-with-d3
+    </script>
+</body>
+
+</html>
